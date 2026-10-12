@@ -103,6 +103,8 @@ export default function App() {
   const [paymentStatus, setPaymentStatus] = useState('');
   const [payments, setPayments] = useState([]);
   const [health, setHealth] = useState('checking');
+  const [initiativeList, setInitiativeList] = useState(initiatives);
+  const [initiativesLoading, setInitiativesLoading] = useState(true);
 
   const totalRaised = useMemo(
     () => initiatives.reduce((total, item) => total + item.raised, 0),
@@ -126,6 +128,40 @@ export default function App() {
       .catch(() => {
         if (active) setHealth('offline');
       });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+
+  // Load initiatives from the backend API.
+  useEffect(() => {
+    let active = true;
+
+    async function loadInitiatives() {
+      try {
+        const response = await fetch(`${API}/api/initiatives`);
+
+        if (!response.ok) {
+          throw new Error('Failed to load initiatives');
+        }
+
+        const data = await response.json();
+
+        if (active && Array.isArray(data.initiatives)) {
+          setInitiativeList(data.initiatives);
+        }
+      } catch (error) {
+        console.error('Could not load initiatives:', error);
+      } finally {
+        if (active) {
+          setInitiativesLoading(false);
+        }
+      }
+    }
+
+    loadInitiatives();
 
     return () => {
       active = false;
@@ -560,7 +596,7 @@ export default function App() {
           </div>
 
           <div className="initiative-grid">
-            {initiatives.map((item, index) => (
+            {initiativeList.map((item, index) => (
               <article
                 className={
                   'initiative-card ' +
