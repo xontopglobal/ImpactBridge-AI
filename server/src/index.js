@@ -3,9 +3,22 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY;
+
+const supabase =
+  supabaseUrl && supabaseKey
+    ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+    : null;
 
 const allowedOrigins = [
   'http://localhost:5173',
@@ -60,7 +73,35 @@ const initiatives = [
       'Illustrative estimate: contributes to outreach and health education resources.',
   },
 ];
+// Read initiatives from Supabase
+app.get('/api/initiatives', async (_req, res) => {
+  if (!supabase) {
+    return res.status(503).json({
+      error: 'Supabase is not configured.',
+    });
+  }
 
+  try {
+    const { data, error } = await supabase
+      .from('initiatives')
+      .select('id, title, category, description, goal_amount, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase initiatives error:', error.message);
+      return res.status(500).json({
+        error: 'Could not load initiatives.',
+      });
+    }
+
+    return res.json({ initiatives: data });
+  } catch (error) {
+    console.error('Initiatives API error:', error.message);
+    return res.status(500).json({
+      error: 'An unexpected error occurred.',
+    });
+  }
+});
 // Health check
 app.get('/health', (_req, res) => {
   res.json({
