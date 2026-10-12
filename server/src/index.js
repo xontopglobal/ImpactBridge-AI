@@ -1,4 +1,3 @@
-
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -7,40 +6,33 @@ import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SECRET_KEY;
-
-const supabase =
-  supabaseUrl && supabaseKey
-    ? createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    })
-    : null;
-
-const allowedOrigins = [
+const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5180',
   'http://127.0.0.1:5180',
-];
+  'https://impact-bridge-ai-eta.vercel.app',
+]);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      const isVercelPreview =
+        typeof origin === 'string' &&
+        /^https:\/\/impact-bridge-ai-[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
+      if (!origin || allowedOrigins.has(origin) || isVercelPreview) {
         return callback(null, true);
       }
 
       return callback(new Error('Origin not allowed by CORS'));
     },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
 app.use(express.json({ limit: '1mb' }));
-
 const initiatives = [
   {
     id: 'school-kits',
@@ -80,20 +72,17 @@ app.get('/api/initiatives', async (_req, res) => {
       error: 'Supabase is not configured.',
     });
   }
-
   try {
     const { data, error } = await supabase
       .from('initiatives')
       .select('id, title, category, description, goal_amount, created_at')
       .order('created_at', { ascending: false });
-
     if (error) {
       console.error('Supabase initiatives error:', error.message);
       return res.status(500).json({
         error: 'Could not load initiatives.',
       });
     }
-
     return res.json({ initiatives: data });
   } catch (error) {
     console.error('Initiatives API error:', error.message);
@@ -116,24 +105,20 @@ app.get('/health', (_req, res) => {
     ),
   });
 });
-
 // AI giving guide
 app.post('/api/assistant', async (req, res) => {
   const message =
     typeof req.body?.message === 'string'
       ? req.body.message.trim().slice(0, 2000)
       : '';
-
   if (!message) {
     return res.status(400).json({
       error: 'Please enter a question.',
     });
   }
-
   const list = Array.isArray(req.body?.initiatives)
     ? req.body.initiatives.slice(0, 10)
     : initiatives;
-
   if (process.env.AI_API_URL && process.env.AI_API_KEY) {
     try {
       const response = await fetch(process.env.AI_API_URL, {
@@ -158,21 +143,16 @@ app.post('/api/assistant', async (req, res) => {
           temperature: 0.4,
         }),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(
           data?.error?.message || 'AI provider request failed'
         );
       }
-
       const answer = data?.choices?.[0]?.message?.content;
-
       if (typeof answer !== 'string' || !answer.trim()) {
         throw new Error('AI provider returned no answer');
       }
-
       return res.json({
         answer: answer.trim(),
         mode: 'model',
@@ -181,14 +161,11 @@ app.post('/api/assistant', async (req, res) => {
       console.error('AI provider error:', error.message);
     }
   }
-
   // Built-in demonstration fallback when no AI provider is configured.
   const q = message.toLowerCase();
-
   let found = list.find((item) =>
     q.includes(String(item.category || '').toLowerCase())
   );
-
   if (!found) {
     found = list.find((item) =>
       String(item.title || '')
@@ -197,22 +174,18 @@ app.post('/api/assistant', async (req, res) => {
         .some((word) => word.length > 5 && q.includes(word))
     );
   }
-
   if (
     !found &&
     /(women|youth|skill|livelihood|business|income)/.test(q)
   ) {
     found = list.find((item) => item.id === 'women-skills');
   }
-
   if (!found && /(health|medical|wellbeing|clinic)/.test(q)) {
     found = list.find((item) => item.id === 'community-health');
   }
-
   if (!found) {
     found = list.find((item) => item.id === 'school-kits') || list[0];
   }
-
   if (!found) {
     return res.json({
       answer:
@@ -220,13 +193,11 @@ app.post('/api/assistant', async (req, res) => {
       mode: 'demo',
     });
   }
-
   return res.json({
     answer: `A useful starting point is "${found.title}" (${found.category}). ${found.description} Suggested example contribution: $${Number(found.amount || 25)}. ${found.impact || 'Any impact estimate is illustrative.'} This is demo guidance based on the supplied initiative data, not verification of the organizer or a guarantee of outcomes.`,
     mode: 'demo',
   });
 });
-
 // PayPal configuration check
 function paypalConfig(res) {
   if (
@@ -239,35 +210,28 @@ function paypalConfig(res) {
     });
     return false;
   }
-
   return true;
 }
-
 // Allow only the official PayPal API hosts.
 function paypalBase() {
   const base = (
     process.env.PAYPAL_BASE_URL ||
     'https://api-m.sandbox.paypal.com'
   ).replace(/\/+$/, '');
-
   const allowedBases = [
     'https://api-m.paypal.com',
     'https://api-m.sandbox.paypal.com',
   ];
-
   if (!allowedBases.includes(base)) {
     throw new Error('Invalid PayPal API base URL configuration.');
   }
-
   return base;
 }
-
 // Request a PayPal OAuth access token.
 async function paypalAccessToken() {
   const auth = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
   ).toString('base64');
-
   const response = await fetch(
     `${paypalBase()}/v1/oauth2/token`,
     {
@@ -279,9 +243,7 @@ async function paypalAccessToken() {
       body: 'grant_type=client_credentials',
     }
   );
-
   const data = await response.json().catch(() => ({}));
-
   if (!response.ok || !data.access_token) {
     throw new Error(
       data.error_description ||
@@ -289,10 +251,8 @@ async function paypalAccessToken() {
       `PayPal authentication failed (${response.status}).`
     );
   }
-
   return data.access_token;
 }
-
 // Send requests to PayPal.
 async function paypalRequest(path, token, body) {
   const response = await fetch(`${paypalBase()}${path}`, {
@@ -304,9 +264,7 @@ async function paypalRequest(path, token, body) {
     },
     body: JSON.stringify(body),
   });
-
   const data = await response.json().catch(() => ({}));
-
   if (!response.ok) {
     throw new Error(
       data.message ||
@@ -314,22 +272,16 @@ async function paypalRequest(path, token, body) {
       `PayPal request failed (${response.status}).`
     );
   }
-
   return data;
 }
-
-
 // Temporary PayPal authentication test — no payment is created.
 app.get('/api/paypal/connection-test', async (_req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(404).json({ error: 'Not found.' });
   }
-
   if (!paypalConfig(res)) return;
-
   try {
     await paypalAccessToken();
-
     return res.json({
       ok: true,
       authenticated: true,
@@ -341,7 +293,6 @@ app.get('/api/paypal/connection-test', async (_req, res) => {
       'PayPal authentication test failed:',
       error.message
     );
-
     return res.status(502).json({
       ok: false,
       authenticated: false,
@@ -350,14 +301,11 @@ app.get('/api/paypal/connection-test', async (_req, res) => {
     });
   }
 });
-
 // Create a PayPal order.
 app.post('/api/paypal/create-order', async (req, res) => {
   if (!paypalConfig(res)) return;
-
   const amount = Number(req.body?.amount);
   const initiativeId = String(req.body?.initiativeId || '');
-
   if (
     !Number.isFinite(amount) ||
     amount < 1 ||
@@ -369,20 +317,16 @@ app.post('/api/paypal/create-order', async (req, res) => {
         'Enter an amount between $1 and $10,000 with at most two decimal places.',
     });
   }
-
   const initiative = initiatives.find(
     (item) => item.id === initiativeId
   );
-
   if (!initiative) {
     return res.status(400).json({
       error: 'Select a valid initiative.',
     });
   }
-
   try {
     const token = await paypalAccessToken();
-
     const order = await paypalRequest(
       '/v2/checkout/orders',
       token,
@@ -408,55 +352,44 @@ app.post('/api/paypal/create-order', async (req, res) => {
         },
       }
     );
-
     if (!order.id) {
       throw new Error('PayPal did not return an order ID.');
     }
-
     return res.json({ id: order.id });
   } catch (error) {
     console.error('PayPal create order error:', error.message);
-
     return res.status(502).json({
       error:
         'Could not create a PayPal order. Check the server credentials, environment and PayPal account eligibility.',
     });
   }
 });
-
 // Capture and verify a PayPal order.
 app.post('/api/paypal/capture-order', async (req, res) => {
   if (!paypalConfig(res)) return;
-
   const orderID = String(req.body?.orderID || '');
   const initiativeId = String(req.body?.initiativeId || '');
-
   if (!/^[A-Z0-9-]{8,80}$/i.test(orderID)) {
     return res.status(400).json({
       error: 'Invalid PayPal order ID.',
     });
   }
-
   if (!initiatives.some((item) => item.id === initiativeId)) {
     return res.status(400).json({
       error: 'Select a valid initiative.',
     });
   }
-
   try {
     const token = await paypalAccessToken();
-
     const data = await paypalRequest(
       `/v2/checkout/orders/${encodeURIComponent(orderID)}/capture`,
       token,
       {}
     );
-
     const purchaseUnit = data.purchase_units?.[0];
     const capture = purchaseUnit?.payments?.captures?.[0];
     const capturedAmount = capture?.amount?.value;
     const capturedCurrency = capture?.amount?.currency_code;
-
     if (
       data.status !== 'COMPLETED' ||
       capture?.status !== 'COMPLETED' ||
@@ -471,7 +404,6 @@ app.post('/api/paypal/capture-order', async (req, res) => {
         status: data.status || 'UNKNOWN',
       });
     }
-
     return res.json({
       status: 'COMPLETED',
       orderID: data.id,
@@ -482,19 +414,16 @@ app.post('/api/paypal/capture-order', async (req, res) => {
     });
   } catch (error) {
     console.error('PayPal capture error:', error.message);
-
     return res.status(502).json({
       error:
         'Could not verify or capture this PayPal order. Check PayPal configuration and server logs.',
     });
   }
 });
-
 // Handle unknown routes.
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
-
 // Start the API server.
 app.listen(PORT, () => {
   console.log(`ImpactBridge AI API listening on port ${PORT}`);
