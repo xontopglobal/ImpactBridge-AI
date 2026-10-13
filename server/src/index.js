@@ -17,6 +17,7 @@ const allowedOrigins = new Set([
 app.use(
   cors({
     origin: (origin, callback) => {
+      console.log('CORS request origin:', origin);
       const isVercelPreview =
         typeof origin === 'string' &&
         /^https:\/\/impact-bridge-ai-[a-z0-9-]+\.vercel\.app$/i.test(origin);
