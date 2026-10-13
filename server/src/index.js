@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
+
 const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -13,6 +18,7 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:5180',
   'https://impact-bridge-ai-eta.vercel.app',
 ]);
+
 
 app.use(
   cors({
