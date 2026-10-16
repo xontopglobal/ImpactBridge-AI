@@ -6,10 +6,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY
-);
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    'Missing SUPABASE_URL or SUPABASE_SECRET_KEY.'
+  );
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
@@ -18,7 +26,6 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:5180',
   'https://impact-bridge-ai-eta.vercel.app',
 ]);
-
 
 app.use(
   cors({
@@ -225,13 +232,16 @@ function paypalBase() {
     process.env.PAYPAL_BASE_URL ||
     'https://api-m.sandbox.paypal.com'
   ).replace(/\/+$/, '');
+
   const allowedBases = [
     'https://api-m.paypal.com',
     'https://api-m.sandbox.paypal.com',
   ];
+
   if (!allowedBases.includes(base)) {
     throw new Error('Invalid PayPal API base URL configuration.');
   }
+
   return base;
 }
 // Request a PayPal OAuth access token.
