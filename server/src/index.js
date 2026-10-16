@@ -21,9 +21,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
-  'http://127.0.0.1:5173',
+  'http://localhost:5174',
   'http://localhost:5180',
-  'http://127.0.0.1:5180',
   'https://impact-bridge-ai-eta.vercel.app',
 ]);
 
@@ -31,6 +30,7 @@ app.use(
   cors({
     origin: (origin, callback) => {
       console.log('CORS request origin:', origin);
+
       const isVercelPreview =
         typeof origin === 'string' &&
         /^https:\/\/impact-bridge-ai-[a-z0-9-]+\.vercel\.app$/i.test(origin);
@@ -45,6 +45,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
 
 app.use(express.json({ limit: '1mb' }));
 const initiatives = [
