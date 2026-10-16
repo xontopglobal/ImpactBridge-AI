@@ -46,6 +46,13 @@ app.use(
   })
 );
 
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    name: 'ImpactBridge AI API',
+    health: '/health'
+  });
+});
 
 app.use(express.json({ limit: '1mb' }));
 const initiatives = [
@@ -106,6 +113,16 @@ app.get('/api/initiatives', async (_req, res) => {
     });
   }
 });
+
+
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    name: 'ImpactBridge AI API',
+    health: '/health'
+  });
+});
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({
